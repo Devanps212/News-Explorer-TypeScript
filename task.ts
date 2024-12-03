@@ -1,11 +1,35 @@
-const mainNews = document.getElementById('main-news')
+const mainNews = document.querySelector('.main-news') as HTMLDivElement
+const otherNews = document.querySelector('.grid-items') as HTMLDivElement
 
-interface News{
-    category: string,
-    title: string,
-    content: string,
-    dateAndTime: string
+let newLimit : number = 7
+let searchQuery : string = ''
+let category : string = 'All'
+let isExpanded :  boolean = false
+
+// type NumericRange<T extends number, N extends any[] = []> = 
+//   N['length'] extends T
+//     ? `${N[number] & number extends 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 ? `0${N[number] & number}` : N[number]}`
+//     : NumericRange<T, [...N, N['length']]>
+
+// type ExcludeZero<T> = Exclude<T, '0' | '00'>
+
+// type Day = Exclude<NumericRange<32>, '0'>
+// type Month = Exclude<NumericRange<13>, '0'>
+// type Year = '2023' | '2024'
+
+// type Hour = NumericRange<24>
+// type Minute = NumericRange<60>
+// type Second = NumericRange<60>
+// type DateAndTime = `${Day}/${Month}/${Year}, ${Hour}:${Minute}:${Second}`
+
+interface News {
+  category: string;
+  title: string;
+  content: string;
+  dateAndTime: string
 }
+
+
 
 const data : News[] = [
     {
@@ -360,6 +384,122 @@ const data : News[] = [
     },
   ];
 
-document.addEventListener('DOMContentLoaded', () : void=>{
-    
+//News Display
+function displayNews(category: string = 'all', searchQuery: string = ''): void {
+  console.log(category)
+  let newList: News[] = category === 'all' ? data : data.filter(news => news.category === category)
+  
+  if(searchQuery){
+    const regex: RegExp = new RegExp(searchQuery, 'i')
+    newList = newList.filter(news => 
+      regex.test(news.title) || regex.test(news.content)
+    );
+  }
+  
+  mainNews.innerHTML = ''
+
+  const main = document.createElement('div')
+  const dateResult = formatDate(newList[0].dateAndTime)
+  
+  if (dateResult.status === 'failed') {
+    alert(dateResult.message)
+    return
+  }
+  
+  const date = dateResult.message
+
+  main.innerHTML = `
+    <h2>${newList[0].title}</h2>
+    <p>${date}</p>
+    <p>${newList[0].content.slice(0, 900)}</p>
+  `
+  
+  mainNews.appendChild(main)
+  
+  otherNews.innerHTML = ''
+  newList.slice(1, newLimit).forEach((data: News, index: number) => {
+  
+    const dateResult = formatDate(data.dateAndTime)
+    if (dateResult.status === 'failed') {
+      alert(dateResult.message)
+      return
+    }
+  
+    const date = dateResult.message
+    const news = document.createElement('div') as HTMLDivElement
+  
+    news.innerHTML = `
+      <h4>${data.title}</h4>
+      <p>${date}</p>
+      <p>${data.content.slice(0, 200)}</p>
+    `
+  
+    otherNews.appendChild(news)
+    const showButton = document.getElementById('show-more') as HTMLButtonElement
+    if(showButton){
+      showButton.innerText = !isExpanded ? 'Show More' : 'Show Less';
+    }
+  })
+}
+
+//Date format
+function formatDate(dateString: string): {message: string, status:"failed" | "success"} {
+  const [day, month, year] = dateString.split(',')[0].split('/')
+
+  const date = new Date(`${month}/${day}/${year}`)
+
+  if(date.getDate() !== Number(day) || date.getMonth() + 1 != Number(month) || date.getFullYear() != Number(year))return {message:"Invalid date", status:"failed"}
+
+  const months : string[]= [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ]
+
+  const dayNumber = date.getDate()
+  const dayWithSuffix : string = dayNumber + 
+    (dayNumber % 10 === 1 && dayNumber !== 11 ? "st" : 
+     dayNumber % 10 === 2 && dayNumber !== 12 ? "nd" : 
+     dayNumber % 10 === 3 && dayNumber !== 13 ? "rd" : "th")
+
+    return {message:`${dayWithSuffix} ${months[date.getMonth()]} ${date.getFullYear()}`, status:"success"}
+}
+
+
+document.addEventListener('DOMContentLoaded',() : void=>{
+  displayNews()
 })
+
+
+//show more
+document.getElementById('show-more').addEventListener('click', (): void=>{
+  showButton()
+})
+
+function showButton() : void{
+  newLimit = isExpanded ? 7 :newLimit + 7
+  isExpanded = !isExpanded
+  displayNews(category, searchQuery)
+}
+
+//search
+const search = document.querySelector('.search-bar') as HTMLInputElement
+search.addEventListener('input', (e: Event):void=>{
+  searchQuery = (e.target as HTMLInputElement).value
+  displayNews(category, searchQuery)
+})
+
+//category Filtering
+const buttons = document.getElementsByClassName('allCategory') as HTMLCollectionOf<HTMLButtonElement>
+
+for (let i = 0; i < buttons.length; i++){
+  buttons[i].addEventListener('click', (): void=>{
+    
+    for (let j = 0; j < buttons.length; j++) {
+      buttons[j].classList.remove('active')
+    }
+
+    buttons[i].classList.add('active')
+    category = buttons[i].innerText.trim().toLowerCase()
+    displayNews(category);
+  });
+}
