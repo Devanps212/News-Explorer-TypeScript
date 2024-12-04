@@ -1,10 +1,8 @@
-const mainNews = document.querySelector('.main-news') as HTMLDivElement
-const otherNews = document.querySelector('.grid-items') as HTMLDivElement
-
 let newLimit : number = 7
 let searchQuery : string = ''
-let category : string = 'All'
+let category : string = 'all'
 let isExpanded :  boolean = false
+let debounceTime : number;
 
 // type NumericRange<T extends number, N extends any[] = []> = 
 //   N['length'] extends T
@@ -22,13 +20,19 @@ let isExpanded :  boolean = false
 // type Second = NumericRange<60>
 // type DateAndTime = `${Day}/${Month}/${Year}, ${Hour}:${Minute}:${Second}`
 
+type Categories = 'business' | 'entertainment' | 'politics' | 'sport' | 'tech'
+
 interface News {
-  category: string;
-  title: string;
-  content: string;
+  category: Categories
+  title: string
+  content: string
   dateAndTime: string
 }
 
+interface Result {
+  message: string,
+  status: 'failed' | 'success'
+}
 
 
 const data : News[] = [
@@ -382,26 +386,39 @@ const data : News[] = [
         'The largest digital panoramic photo in the world has been created by researchers in the Netherlands.  The finished image is 2.5 billion pixels in size - making it about 500 times the resolution of images produced by good consumer digital cameras. The huge image of Delft was created by stitching together 600 single snaps of the Dutch city taken at a fixed spot. If printed out in standard 300 dots per inch resolution, the picture would be 2.5m high and 6m long.  The researchers have put the image on a website which lets viewers explore the wealth of detail that it captures. Tools on the page let viewers zoom in on the city and its surroundings in great detail. The website is already proving popular and currently has more than 200,000 visitors every day.  The image was created by imaging experts from the Dutch research and technology laboratory TNO which created the 2.5 gigapixel photo as a summer time challenge.  The goal of the project was to be one of the first groups to make gigapixel images. The first image of such a size was manually constructed by US photographer Max Lyons in November 2003. That image portrayed Bryce Canyon National Park, in Utah, and was made up of 196 separate photographs. The panorama of Delft is a little staid in contrast to the dramatic rockscape captured in Mr Lyons\' image. "He did it all by hand, which was an enormous effort, and we got the idea that if you use automatic techniques, it would be feasible to build a larger image," said Jurgen den Hartog, one of the TNO researchers behind the project. "We were not competing with Mr Lyons, but it started as a lunchtime bet."  The Dutch team used already available technologies, although it had to upgrade them to be able to handle the high-resolution image.  "We had to rewrite almost all the tools," Me den Hartog told the BBC News website. "All standard Windows viewers available would not be able to load such a large image, so we had to develop one ourselves." The 600 component pictures were taken on July 2004 by a computer-controlled camera with a 400 mm lens. Each image was made to slightly overlap so they could be accurately arranged into a composite. The stitching process was also done automatically using five powerful PCs over three days. Following the success of this project, and with promises of help from others, the TNO team is considering creating a full 360-degree panoramic view of another Dutch city, with even higher resolution.              ',
       dateAndTime: "17/03/2023, 11:58:52",
     },
-  ];
+  ]
 
 //News Display
-function displayNews(category: string = 'all', searchQuery: string = ''): void {
-  console.log(category)
-  let newList: News[] = category === 'all' ? data : data.filter(news => news.category === category)
-  
-  if(searchQuery){
-    const regex: RegExp = new RegExp(searchQuery, 'i')
-    newList = newList.filter(news => 
+function displayNews(category: string = 'all', searchQuery: string = ''): void{
+
+  const mainNews = document.querySelector('.main-news') as HTMLDivElement
+  const otherNews = document.querySelector('.grid-items') as HTMLDivElement
+
+  let newList: News[] = category === 'all' ? getRandomItems(data, 16)  : data.filter(news => news.category === category)
+
+  let highlightWord = (text: string): string => text
+
+  if (searchQuery){
+    const regex: RegExp = new RegExp(`(${searchQuery})`, 'gi')
+    
+    highlightWord = (text: string): string =>
+      text.replace(regex, `<span style="color: red;">$1</span>`)
+
+    newList = newList.filter(news =>
       regex.test(news.title) || regex.test(news.content)
-    );
+    ).map(news =>({
+      ...news,
+      title: highlightWord(news.title),
+      content: highlightWord(news.content),
+    }))
   }
-  
+
   mainNews.innerHTML = ''
 
   const main = document.createElement('div')
   const dateResult = formatDate(newList[0].dateAndTime)
   
-  if (dateResult.status === 'failed') {
+  if(dateResult.status === 'failed'){
     alert(dateResult.message)
     return
   }
@@ -417,10 +434,10 @@ function displayNews(category: string = 'all', searchQuery: string = ''): void {
   mainNews.appendChild(main)
   
   otherNews.innerHTML = ''
-  newList.slice(1, newLimit).forEach((data: News, index: number) => {
+  newList.slice(1, newLimit).forEach((data: News)=>{
   
     const dateResult = formatDate(data.dateAndTime)
-    if (dateResult.status === 'failed') {
+    if(dateResult.status === 'failed'){
       alert(dateResult.message)
       return
     }
@@ -437,18 +454,24 @@ function displayNews(category: string = 'all', searchQuery: string = ''): void {
     otherNews.appendChild(news)
     const showButton = document.getElementById('show-more') as HTMLButtonElement
     if(showButton){
-      showButton.innerText = !isExpanded ? 'Show More' : 'Show Less';
+      showButton.innerText = !isExpanded ? 'Show More' : 'Show Less'
     }
   })
 }
 
+//Random Mixed Data
+function getRandomItems(arr: News[], limit: number): News[]{
+  const shuffled = arr.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, limit);
+}
+
 //Date format
-function formatDate(dateString: string): {message: string, status:"failed" | "success"} {
+function formatDate(dateString: string): Result{
   const [day, month, year] = dateString.split(',')[0].split('/')
 
   const date = new Date(`${month}/${day}/${year}`)
 
-  if(date.getDate() !== Number(day) || date.getMonth() + 1 != Number(month) || date.getFullYear() != Number(year))return {message:"Invalid date", status:"failed"}
+  if(date.getDate() !== Number(day) || date.getMonth() + 1 !== Number(month) || date.getFullYear() !== Number(year))return {message:"Invalid date", status:"failed"}
 
   const months : string[]= [
     "January", "February", "March", "April", "May", "June",
@@ -461,10 +484,10 @@ function formatDate(dateString: string): {message: string, status:"failed" | "su
      dayNumber % 10 === 2 && dayNumber !== 12 ? "nd" : 
      dayNumber % 10 === 3 && dayNumber !== 13 ? "rd" : "th")
 
-    return {message:`${dayWithSuffix} ${months[date.getMonth()]} ${date.getFullYear()}`, status:"success"}
+  return {message:`${dayWithSuffix} ${months[date.getMonth()]} ${date.getFullYear()}`, status:"success"}
 }
 
-
+//Show Content
 document.addEventListener('DOMContentLoaded',() : void=>{
   displayNews()
 })
@@ -476,7 +499,7 @@ document.getElementById('show-more').addEventListener('click', (): void=>{
 })
 
 function showButton() : void{
-  newLimit = isExpanded ? 7 :newLimit + 7
+  newLimit = isExpanded ? 7 :newLimit + 8
   isExpanded = !isExpanded
   displayNews(category, searchQuery)
 }
@@ -485,21 +508,36 @@ function showButton() : void{
 const search = document.querySelector('.search-bar') as HTMLInputElement
 search.addEventListener('input', (e: Event):void=>{
   searchQuery = (e.target as HTMLInputElement).value
-  displayNews(category, searchQuery)
+  debounce(()=>displayNews(category, searchQuery),500)
 })
+
+function debounce(func: Function, delay: number): void{
+  
+  if(debounceTime)clearTimeout(debounceTime)
+
+  debounceTime = setTimeout(()=>{
+    func()
+  }, delay)
+}
+
 
 //category Filtering
 const buttons = document.getElementsByClassName('allCategory') as HTMLCollectionOf<HTMLButtonElement>
 
-for (let i = 0; i < buttons.length; i++){
-  buttons[i].addEventListener('click', (): void=>{
-    
+for (let i = 0; i < buttons.length; i++) {
+  if (buttons[i].innerText.trim().toLowerCase() === 'all') {
+    buttons[i].classList.add('active')
+    category = 'all'
+    displayNews(category)
+  }
+  
+  buttons[i].addEventListener('click', (): void => {
     for (let j = 0; j < buttons.length; j++) {
       buttons[j].classList.remove('active')
     }
 
     buttons[i].classList.add('active')
     category = buttons[i].innerText.trim().toLowerCase()
-    displayNews(category);
-  });
+    displayNews(category)
+  })
 }
