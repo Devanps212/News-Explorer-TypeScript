@@ -514,7 +514,6 @@ search.addEventListener('input', (e: Event):void=>{
 function debounce(func: Function, delay: number): void{
   
   if(debounceTime)clearTimeout(debounceTime)
-
   debounceTime = setTimeout(()=>{
     func()
   }, delay)
